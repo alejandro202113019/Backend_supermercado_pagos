@@ -30,7 +30,7 @@ class AuditLog(BaseModel):
     action: AuditAction
     resource: str  # e.g., "user", "product", "account"
     resource_id: Optional[str] = None
-    details: Dict[str, Any] = {}
+    details: Dict[str, Any] = Field(default_factory=dict)
     ip_address: str
     user_agent: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
@@ -42,6 +42,7 @@ class AuditLog(BaseModel):
     class Config:
         populate_by_name = True
         arbitrary_types_allowed = True
+        exclude_none = True  # Excluir campos None al serializar
 
 
 class SessionLog(BaseModel):
@@ -59,3 +60,4 @@ class SessionLog(BaseModel):
     class Config:
         populate_by_name = True
         arbitrary_types_allowed = True
+        exclude_none = True  # Excluir campos None al serializar
