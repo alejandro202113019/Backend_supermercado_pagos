@@ -37,7 +37,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         
         # Agregar headers de seguridad a la respuesta
-        self._add_security_headers(response)
+        self._add_security_headers(response, request)
         
         return response
     
@@ -46,7 +46,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         
         # Validar User-Agent (prevenir requests automatizados maliciosos)
         user_agent = request.headers.get("user-agent", "")
-        suspicious_agents = ["sqlmap", "nikto", "nmap", "masscan", "bot"]
+        suspicious_agents = ["sqlmap", "nikto", "nmap", "masscan"]
         
         if any(agent in user_agent.lower() for agent in suspicious_agents):
             raise HTTPException(
@@ -111,8 +111,11 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         else:
             return data
     
-    def _add_security_headers(self, response: Response):
+    def _add_security_headers(self, response: Response, request: Request):
         """Agrega headers de seguridad a la respuesta"""
+        
+        # Obtener la ruta del request
+        path = request.url.path
         
         # Prevenir clickjacking
         response.headers["X-Frame-Options"] = "DENY"
@@ -123,16 +126,29 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         # Activar XSS protection
         response.headers["X-XSS-Protection"] = "1; mode=block"
         
-        # Contenido de seguridad estricto
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: https:; "
-            "font-src 'self'; "
-            "connect-src 'self'; "
-            "frame-ancestors 'none'"
-        )
+        # Content Security Policy - Más permisivo para docs de Swagger
+        if path in ["/docs", "/redoc"] or path.startswith("/openapi"):
+            # CSP permisivo para documentación de API
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "img-src 'self' data: https:; "
+                "font-src 'self' https://cdn.jsdelivr.net; "
+                "connect-src 'self'; "
+                "frame-ancestors 'none'"
+            )
+        else:
+            # CSP estricto para el resto de la aplicación
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data: https:; "
+                "font-src 'self'; "
+                "connect-src 'self'; "
+                "frame-ancestors 'none'"
+            )
         
         # Forzar HTTPS (en producción)
         response.headers["Strict-Transport-Security"] = (
@@ -159,6 +175,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.request_counts = {}
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        # No aplicar rate limiting a documentación
+        if request.url.path in ["/docs", "/redoc", "/openapi.json"]:
+            return await call_next(request)
+        
         # Obtener IP del cliente
         client_ip = request.client.host if request.client else "unknown"
         

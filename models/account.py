@@ -1,38 +1,57 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 from enum import Enum
 
 
-class ProductStatus(str, Enum):
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    DISCONTINUED = "discontinued"
+class AccountStatus(str, Enum):
+    PENDING = "pending"
+    PAID = "paid"
+    OVERDUE = "overdue"
+    CANCELLED = "cancelled"
 
 
-class ProductCategory(str, Enum):
-    FOOD = "food"
-    BEVERAGES = "beverages"
-    CLEANING = "cleaning"
-    PERSONAL_CARE = "personal_care"
-    HOME = "home"
-    OTHER = "other"
+class PaymentMethod(str, Enum):
+    CASH = "cash"
+    CARD = "card"
+    TRANSFER = "transfer"
+    CHECK = "check"
 
 
-class Product(BaseModel):
+class AccountItem(BaseModel):
+    product_id: str
+    product_name: str
+    quantity: int
+    unit_price: float
+    total_price: float
+
+
+class PaymentRecord(BaseModel):
+    payment_date: datetime
+    amount: float
+    payment_method: PaymentMethod
+    reference: Optional[str] = None
+    processed_by: str  # User ID who processed the payment
+
+
+class Account(BaseModel):
     id: Optional[str] = Field(None, alias="_id")
-    name: str
-    description: Optional[str] = None
-    price: float
-    category: ProductCategory = ProductCategory.OTHER
-    brand: Optional[str] = None
-    barcode: Optional[str] = None
-    stock: int = 0
-    min_stock: int = 0
-    status: ProductStatus = ProductStatus.ACTIVE
+    account_number: str  # Número único de cuenta
+    client_id: str  # User ID del cliente
+    client_name: str
+    client_email: str
+    items: List[AccountItem] = []
+    subtotal: float = 0.0
+    tax: float = 0.0
+    discount: float = 0.0
+    total_amount: float = 0.0
+    status: AccountStatus = AccountStatus.PENDING
+    due_date: datetime
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    created_by: Optional[str] = None  # User ID
+    created_by: str  # User ID who created the account
+    payments: List[PaymentRecord] = []
+    notes: Optional[str] = None
     
     class Config:
         populate_by_name = True
