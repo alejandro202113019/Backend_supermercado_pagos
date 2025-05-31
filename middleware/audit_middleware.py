@@ -96,12 +96,12 @@ class AuditMiddleware(BaseHTTPMiddleware):
         
         # Solo auditar ciertos tipos de requests
         audit_paths = {
-            "/auth/login": "login_attempt",
+            "/auth/login": "login",
             "/auth/logout": "logout",
-            "/users": "user_access",
-            "/products": "product_access", 
-            "/accounts": "account_access",
-            "/payments": "payment_access"
+            "/users": "read",
+            "/products": "read", 
+            "/accounts": "read",
+            "/payments": "read"
         }
         
         # Determinar si debe auditarse
@@ -116,7 +116,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 resource = audit_path.split("/")[1]
                 break
         
-        # Auditar operaciones CRUD
+        # Auditar operaciones CRUD con acciones válidas
         if method in ["POST", "PUT", "PATCH", "DELETE"]:
             should_audit = True
             if method == "POST":
@@ -134,7 +134,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 await audit_service.log_action(
                     user_id=user_info.get("user_id") if user_info else None,
                     username=user_info.get("username") if user_info else "anonymous",
-                    action=action,
+                    action=action,  # Usar solo acciones válidas del enum
                     resource=resource,
                     details={
                         "method": method,

@@ -51,6 +51,7 @@ async def create_product(
             detail=str(e)
         )
     except Exception as e:
+        print(f"Error en create_product: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error interno del servidor"
@@ -64,7 +65,7 @@ async def get_products(
     name: Optional[str] = None,
     category: Optional[ProductCategory] = None,
     brand: Optional[str] = None,
-    status: Optional[ProductStatus] = None,
+    product_status: Optional[ProductStatus] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
     current_user = Depends(get_current_active_user)
@@ -76,7 +77,7 @@ async def get_products(
             name=name,
             category=category,
             brand=brand,
-            status=status,
+            status=product_status,  # Usar product_status en lugar de status para evitar conflictos
             min_price=min_price,
             max_price=max_price
         )
@@ -95,6 +96,9 @@ async def get_products(
         )
         
     except Exception as e:
+        print(f"Error en get_products: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error interno del servidor"
@@ -109,6 +113,7 @@ async def get_active_products(current_user = Depends(get_current_active_user)):
         return products
         
     except Exception as e:
+        print(f"Error en get_active_products: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error interno del servidor"
@@ -150,6 +155,7 @@ async def get_product(
             detail=str(e)
         )
     except Exception as e:
+        print(f"Error en get_product: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error interno del servidor"
@@ -200,6 +206,7 @@ async def update_product(
             detail=str(e)
         )
     except Exception as e:
+        print(f"Error en update_product: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error interno del servidor"
@@ -241,6 +248,7 @@ async def delete_product(
             detail=str(e)
         )
     except Exception as e:
+        print(f"Error en delete_product: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error interno del servidor"
@@ -283,6 +291,7 @@ async def update_product_stock(
             detail=str(e)
         )
     except Exception as e:
+        print(f"Error en update_product_stock: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error interno del servidor"

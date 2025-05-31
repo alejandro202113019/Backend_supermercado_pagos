@@ -14,6 +14,11 @@ class AuditAction(str, Enum):
     DELETE = "delete"
     PAYMENT = "payment"
     PASSWORD_CHANGE = "password_change"
+    # Agregar nuevas acciones válidas para evitar errores
+    ACCESS = "access"
+    USER_ACCESS = "user_access"
+    PRODUCT_ACCESS = "product_access"
+    ACCOUNT_ACCESS = "account_access"
 
 
 class AuditLevel(str, Enum):

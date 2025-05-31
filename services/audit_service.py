@@ -35,6 +35,10 @@ class AuditService:
         try:
             db: AsyncIOMotorDatabase = await self.get_database()
             
+            if db is None:
+                print("Error: Database is None in audit_service.log_action")
+                return
+            
             audit_log = AuditLog(
                 user_id=user_id,
                 username=username,
@@ -92,6 +96,10 @@ class AuditService:
             if success:
                 db: AsyncIOMotorDatabase = await self.get_database()
                 
+                if db is None:
+                    print("Error: Database is None in audit_service.log_login")
+                    return session_id
+                
                 # Cerrar sesiones activas anteriores
                 await db[self.session_collection].update_many(
                     {"user_id": user_id, "is_active": True},
@@ -130,6 +138,10 @@ class AuditService:
         try:
             db: AsyncIOMotorDatabase = await self.get_database()
             
+            if db is None:
+                print("Error: Database is None in audit_service.log_logout")
+                return
+            
             # Registrar en audit log
             await self.log_action(
                 user_id=user_id,
@@ -154,6 +166,10 @@ class AuditService:
         try:
             db: AsyncIOMotorDatabase = await self.get_database()
             
+            if db is None:
+                print("Error: Database is None in audit_service.update_session_activity")
+                return
+            
             await db[self.session_collection].update_one(
                 {"session_id": session_id, "is_active": True},
                 {"$set": {"last_activity": datetime.utcnow()}}
@@ -171,6 +187,15 @@ class AuditService:
         """Obtiene logs de auditoría con filtros"""
         try:
             db: AsyncIOMotorDatabase = await self.get_database()
+            
+            if db is None:
+                print("Error: Database is None in audit_service.get_audit_logs")
+                return {
+                    "logs": [],
+                    "total": 0,
+                    "page": page,
+                    "size": size
+                }
             
             # Construir query
             query = {}
@@ -225,6 +250,10 @@ class AuditService:
         try:
             db: AsyncIOMotorDatabase = await self.get_database()
             
+            if db is None:
+                print("Error: Database is None in audit_service.get_active_sessions")
+                return []
+            
             query = {"is_active": True}
             if user_id:
                 query["user_id"] = user_id
@@ -242,6 +271,10 @@ class AuditService:
         """Fuerza el cierre de una sesión"""
         try:
             db: AsyncIOMotorDatabase = await self.get_database()
+            
+            if db is None:
+                print("Error: Database is None in audit_service.force_logout_session")
+                return False
             
             result = await db[self.session_collection].update_one(
                 {"session_id": session_id, "is_active": True},

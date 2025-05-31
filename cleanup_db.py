@@ -18,6 +18,10 @@ async def cleanup_database():
         client = AsyncIOMotorClient(settings.mongodb_url)
         db = client[settings.database_name]
         
+        # Probar conexión
+        await client.admin.command('ping')
+        print("✅ Conexión a MongoDB exitosa")
+        
         # 1. Limpiar documentos con _id: null en audit_logs
         print("🔍 Limpiando audit_logs con _id null...")
         result1 = await db.audit_logs.delete_many({"_id": None})
@@ -54,16 +58,19 @@ async def cleanup_database():
             print(f"   📧 Email: {admin_user.get('email')}")
             print(f"   👤 Username: {admin_user.get('username')}")
             print(f"   🔑 Role: {admin_user.get('role')}")
+            print(f"   🆔 ID: {admin_user.get('_id')}")
         else:
             print("   ❌ Usuario admin NO encontrado")
         
-        await client.close()
-        
+        # 5. Cerrar conexión correctamente
+        client.close()
         print("\n🎉 LIMPIEZA COMPLETADA!")
         return True
         
     except Exception as e:
         print(f"❌ Error durante la limpieza: {e}")
+        import traceback
+        print(f"   Detalles: {traceback.format_exc()}")
         return False
 
 if __name__ == "__main__":

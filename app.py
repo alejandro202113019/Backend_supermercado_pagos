@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import uvicorn
 import time
+import traceback
 
 # Importar configuración y base de datos
 from config.settings import settings
@@ -111,8 +112,12 @@ async def database_exception_handler(request: Request, exc: DatabaseException):
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """Manejador para excepciones no capturadas"""
+    print(f"🚨 ERROR NO MANEJADO: {exc}")
+    print(f"📍 Path: {request.url.path}")
+    print(f"🔍 Traceback completo:")
+    traceback.print_exc()
+    
     if settings.debug:
-        import traceback
         error_detail = f"Error interno: {str(exc)}\n{traceback.format_exc()}"
     else:
         error_detail = "Error interno del servidor"
