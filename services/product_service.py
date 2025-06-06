@@ -227,37 +227,26 @@ class ProductService:
             import traceback
             traceback.print_exc()
             raise ValidationException("Error interno al actualizar producto")
-    
-    async def delete_product(
-        self,
-        product_id: str,
-        deleted_by_id: str,
-        ip_address: str
-    ) -> bool:
-        """Elimina un producto (soft delete)"""
+
+    # Función modificada para un hard delete
+    async def delete_product(self, product_id: str, deleted_by_id: str, ip_address: str) -> bool:
+        """Elimina un producto de forma permanente (hard delete)"""
         try:
             db: AsyncIOMotorDatabase = await self.get_database()
             audit_service = await self.get_audit_service()
-            
+
+            # Verificar si el ID del producto es válido
             if not ObjectId.is_valid(product_id):
                 raise ValidationException("ID de producto inválido")
-            
-            # Verificar que el producto existe
+
+            # Buscar el producto en la base de datos
             existing_product = await db[self.collection].find_one({"_id": ObjectId(product_id)})
             if not existing_product:
                 raise NotFoundException("Producto no encontrado")
-            
-            # Soft delete - cambiar estado a discontinuado
-            await db[self.collection].update_one(
-                {"_id": ObjectId(product_id)},
-                {
-                    "$set": {
-                        "status": ProductStatus.DISCONTINUED,
-                        "updated_at": datetime.utcnow()
-                    }
-                }
-            )
-            
+
+            # Eliminar el producto físicamente de la base de datos
+            await db[self.collection].delete_one({"_id": ObjectId(product_id)})
+
             # Log de auditoría
             await audit_service.log_action(
                 user_id=deleted_by_id,
@@ -271,9 +260,9 @@ class ProductService:
                 },
                 ip_address=ip_address
             )
-            
+
             return True
-            
+
         except (ValidationException, NotFoundException):
             raise
         except Exception as e:
@@ -281,7 +270,7 @@ class ProductService:
             import traceback
             traceback.print_exc()
             raise ValidationException("Error interno al eliminar producto")
-    
+
     async def get_products(
         self,
         page: int = 1,
