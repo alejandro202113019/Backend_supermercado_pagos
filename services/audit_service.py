@@ -1,84 +1,70 @@
 import uuid
 from datetime import datetime
 from typing import Optional, Dict, Any, List
-from motor.motor_asyncio import AsyncIOMotorDatabase
-from models.audit import AuditLog, SessionLog, AuditAction, AuditLevel
+import os
+
+# Asegúrate de que estas importaciones sean correctas para tu modelo
+from models.audit import AuditLog, SessionLog, AuditAction, AuditLevel  # Importar correctamente AuditLevel
 from schemas.audit import AuditSearchFilters
 
 
 class AuditService:
     def __init__(self):
-        self.audit_collection = "audit_logs"
+        self.audit_log_file = "audit_log.txt"  # Archivo para guardar los logs
         self.session_collection = "session_logs"
-    
-    async def get_database(self):
-        """Obtiene la base de datos - importación diferida para evitar circular imports"""
-        from config.database import get_database
-        return await get_database()
-    
+
+    def log_to_file(self, log_message: str):
+        """Función que guarda el mensaje en un archivo de texto"""
+        try:
+            with open(self.audit_log_file, "a") as file:
+                file.write(log_message + "\n")
+        except Exception as e:
+            print(f"Error escribiendo el log en archivo: {e}")
+
     async def log_action(
-        self,
-        user_id: Optional[str],
-        username: Optional[str],
-        action: AuditAction,
-        resource: str,
-        resource_id: Optional[str] = None,
-        details: Dict[str, Any] = None,
-        ip_address: str = "unknown",
-        user_agent: Optional[str] = None,
-        level: AuditLevel = AuditLevel.INFO,
-        success: bool = True,
-        error_message: Optional[str] = None,
-        session_id: Optional[str] = None
+            self,
+            user_id: Optional[str],
+            username: Optional[str],
+            action: AuditAction,
+            resource: str,
+            resource_id: Optional[str] = None,
+            details: Dict[str, Any] = None,
+            ip_address: str = "unknown",
+            user_agent: Optional[str] = None,
+            level: AuditLevel = AuditLevel.INFO,  # Uso correcto de AuditLevel
+            success: bool = True,
+            error_message: Optional[str] = None,
+            session_id: Optional[str] = None
     ):
+        print("Entro al log de auditoria")
         """Registra una acción en el log de auditoría"""
         try:
-            db: AsyncIOMotorDatabase = await self.get_database()
-            
-            if db is None:
-                print("Error: Database is None in audit_service.log_action")
-                return
-            
-            audit_log = AuditLog(
-                user_id=user_id,
-                username=username,
-                action=action,
-                resource=resource,
-                resource_id=resource_id,
-                details=details or {},
-                ip_address=ip_address,
-                user_agent=user_agent,
-                level=level,
-                success=success,
-                error_message=error_message,
-                session_id=session_id
-            )
-            
-            # Convertir a dict y excluir el campo id (None) para que MongoDB genere uno automáticamente
-            audit_doc = audit_log.dict(by_alias=True, exclude_unset=True)
-            if audit_doc.get("_id") is None:
-                audit_doc.pop("_id", None)
-            
-            await db[self.audit_collection].insert_one(audit_doc)
-            
+            log_message = f"{datetime.utcnow()} - ACTION: {action} - USER: {username} - RESOURCE: {resource} - " \
+                          f"RESOURCE_ID: {resource_id} - SUCCESS: {success} - IP: {ip_address} - SESSION_ID: {session_id} - " \
+                          f"DETAILS: {details or {} } - ERROR: {error_message if error_message else 'None'}"
+
+            # Log en archivo de texto
+            self.log_to_file(log_message)
+
+            print("Log registrado en archivo:", log_message)
+
         except Exception as e:
-            # No fallar si hay error en auditoría - solo imprimir el error
             print(f"Error en auditoría: {e}")
-    
+
     async def log_login(
-        self,
-        user_id: str,
-        username: str,
-        ip_address: str,
-        user_agent: Optional[str] = None,
-        success: bool = True,
-        error_message: Optional[str] = None
+            self,
+            user_id: str,
+            username: str,
+            ip_address: str,
+            user_agent: Optional[str] = None,
+            success: bool = True,
+            error_message: Optional[str] = None
     ) -> str:
         """Registra un intento de login y crea/actualiza sesión"""
         session_id = str(uuid.uuid4())
-        
+
         try:
-            # Registrar en audit log
+            # Registrar en log de auditoría
             await self.log_action(
                 user_id=user_id if success else None,
                 username=username,
@@ -91,103 +77,58 @@ class AuditService:
                 error_message=error_message,
                 session_id=session_id
             )
-            
-            # Si el login fue exitoso, crear sesión
-            if success:
-                db: AsyncIOMotorDatabase = await self.get_database()
-                
-                if db is None:
-                    print("Error: Database is None in audit_service.log_login")
-                    return session_id
-                
-                # Cerrar sesiones activas anteriores
-                await db[self.session_collection].update_many(
-                    {"user_id": user_id, "is_active": True},
-                    {"$set": {"is_active": False, "logout_time": datetime.utcnow()}}
-                )
-                
-                # Crear nueva sesión
-                session_log = SessionLog(
-                    user_id=user_id,
-                    username=username,
-                    session_id=session_id,
-                    login_time=datetime.utcnow(),
-                    ip_address=ip_address,
-                    user_agent=user_agent
-                )
-                
-                session_doc = session_log.dict(by_alias=True, exclude_unset=True)
-                if session_doc.get("_id") is None:
-                    session_doc.pop("_id", None)
-                
-                await db[self.session_collection].insert_one(session_doc)
-                
+
         except Exception as e:
             print(f"Error en log_login: {e}")
-        
+
         return session_id
-    
+
     async def log_logout(
-        self,
-        user_id: str,
-        username: str,
-        session_id: str,
-        ip_address: str
+            self,
+            user_id: str,
+            username: str,
+            session_id: str,
+            ip_address: str
     ):
         """Registra logout y cierra sesión"""
         try:
-            db: AsyncIOMotorDatabase = await self.get_database()
-            
-            if db is None:
-                print("Error: Database is None in audit_service.log_logout")
-                return
-            
-            # Registrar en audit log
-            await self.log_action(
-                user_id=user_id,
-                username=username,
-                action=AuditAction.LOGOUT,
-                resource="auth",
-                ip_address=ip_address,
-                session_id=session_id
-            )
-            
-            # Cerrar sesión
-            await db[self.session_collection].update_one(
-                {"session_id": session_id, "is_active": True},
-                {"$set": {"is_active": False, "logout_time": datetime.utcnow()}}
-            )
-            
+            log_message = f"{datetime.utcnow()} - LOGOUT - USER: {username} - SESSION_ID: {session_id} - IP: {ip_address}"
+
+            # Log en archivo de texto
+            self.log_to_file(log_message)
+
+            print("Log de logout registrado:", log_message)
+
         except Exception as e:
             print(f"Error en log_logout: {e}")
-    
+
     async def update_session_activity(self, session_id: str):
         """Actualiza la última actividad de la sesión"""
         try:
             db: AsyncIOMotorDatabase = await self.get_database()
-            
+
             if db is None:
                 print("Error: Database is None in audit_service.update_session_activity")
                 return
-            
+
             await db[self.session_collection].update_one(
                 {"session_id": session_id, "is_active": True},
                 {"$set": {"last_activity": datetime.utcnow()}}
             )
-            
+
         except Exception as e:
             print(f"Error actualizando actividad de sesión: {e}")
-    
+
     async def get_audit_logs(
-        self,
-        filters: AuditSearchFilters,
-        page: int = 1,
-        size: int = 50
+            self,
+            filters: AuditSearchFilters,
+            page: int = 1,
+            size: int = 50
     ) -> Dict[str, Any]:
         """Obtiene logs de auditoría con filtros"""
         try:
             db: AsyncIOMotorDatabase = await self.get_database()
-            
+
             if db is None:
                 print("Error: Database is None in audit_service.get_audit_logs")
                 return {
@@ -196,7 +137,7 @@ class AuditService:
                     "page": page,
                     "size": size
                 }
-            
+
             # Construir query
             query = {}
             if filters.user_id:
@@ -211,7 +152,7 @@ class AuditService:
                 query["success"] = filters.success
             if filters.ip_address:
                 query["ip_address"] = filters.ip_address
-            
+
             # Filtros de fecha
             if filters.date_from or filters.date_to:
                 date_query = {}
@@ -220,22 +161,22 @@ class AuditService:
                 if filters.date_to:
                     date_query["$lte"] = filters.date_to
                 query["timestamp"] = date_query
-            
+
             # Contar total
             total = await db[self.audit_collection].count_documents(query)
-            
+
             # Obtener logs paginados
             skip = (page - 1) * size
             cursor = db[self.audit_collection].find(query).sort("timestamp", -1).skip(skip).limit(size)
             logs = await cursor.to_list(length=size)
-            
+
             return {
                 "logs": logs,
                 "total": total,
                 "page": page,
                 "size": size
             }
-            
+
         except Exception as e:
             print(f"Error obteniendo audit logs: {e}")
             return {
@@ -244,45 +185,44 @@ class AuditService:
                 "page": page,
                 "size": size
             }
-    
+
     async def get_active_sessions(self, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Obtiene sesiones activas"""
         try:
             db: AsyncIOMotorDatabase = await self.get_database()
-            
+
             if db is None:
                 print("Error: Database is None in audit_service.get_active_sessions")
                 return []
-            
+
             query = {"is_active": True}
             if user_id:
                 query["user_id"] = user_id
-            
+
             cursor = db[self.session_collection].find(query).sort("login_time", -1)
             sessions = await cursor.to_list(length=None)
-            
+
             return sessions
-            
         except Exception as e:
             print(f"Error obteniendo sesiones activas: {e}")
             return []
-    
+
     async def force_logout_session(self, session_id: str) -> bool:
         """Fuerza el cierre de una sesión"""
         try:
             db: AsyncIOMotorDatabase = await self.get_database()
-            
+
             if db is None:
                 print("Error: Database is None in audit_service.force_logout_session")
                 return False
-            
+
             result = await db[self.session_collection].update_one(
                 {"session_id": session_id, "is_active": True},
                 {"$set": {"is_active": False, "logout_time": datetime.utcnow()}}
             )
-            
+
             return result.modified_count > 0
-            
+
         except Exception as e:
             print(f"Error forzando logout: {e}")
             return False

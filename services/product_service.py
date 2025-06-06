@@ -75,7 +75,7 @@ class ProductService:
             product.id = str(result.inserted_id)
             
             # Log de auditoría
-            await audit_service.log_action(
+            audit_service.log_action(
                 user_id=created_by_id,
                 username="admin",
                 action="create",
@@ -88,6 +88,7 @@ class ProductService:
                     "created_by": created_by_id
                 },
                 ip_address=ip_address
+
             )
             
             return product
@@ -203,7 +204,7 @@ class ProductService:
             )
             
             # Log de auditoría
-            await audit_service.log_action(
+            audit_service.log_action(
                 user_id=updated_by_id,
                 username="admin",
                 action="update",
@@ -248,7 +249,7 @@ class ProductService:
             await db[self.collection].delete_one({"_id": ObjectId(product_id)})
 
             # Log de auditoría
-            await audit_service.log_action(
+            audit_service.log_action(
                 user_id=deleted_by_id,
                 username="admin",
                 action="delete",
@@ -427,7 +428,7 @@ class ProductService:
             )
             
             # Log de auditoría
-            await audit_service.log_action(
+            audit_service.log_action(
                 user_id=updated_by_id,
                 username="system",
                 action="update",
